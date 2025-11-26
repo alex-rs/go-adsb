@@ -10,6 +10,6 @@ jobs:
     name: Release Updates
     steps:
       - name: Refresh go.dev
-        run: curl https://proxy.golang.org/kreklow.us/go/go-adsb/@v/${GITHUB_REF#'refs/tags/'}.info
+        run: curl https://proxy.golang.org/github.com/alex-rs/go-adsb/@v/${GITHUB_REF#'refs/tags/'}.info
       - name: Refresh Go Report Card
-        run: curl -d "repo=kreklow.us/go/go-adsb" https://goreportcard.com/checks
+        run: curl -d "repo=github.com/alex-rs/go-adsb" https://goreportcard.com/checks

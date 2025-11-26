@@ -33,10 +33,8 @@ type Frame struct {
 	data bytes.Buffer
 }
 
-// UnmarshalBinary stores a Beast message.
-func (f *Frame) UnmarshalBinary(data []byte) error {
-	f.data.Reset()
-
+// validateBeastFormat checks if the data has a valid Beast format header.
+func validateBeastFormat(data []byte) error {
 	if len(data) < 9 {
 		return newError(nil, "received truncated data")
 	}
@@ -46,6 +44,35 @@ func (f *Frame) UnmarshalBinary(data []byte) error {
 		return newErrorf(nil, "invalid data format: %04x", data[0:2])
 	}
 
+	return nil
+}
+
+// validateBeastLength checks the length based on message type.
+func validateBeastLength(msgType byte, length int) error {
+	expectedLengths := map[byte]int{
+		0x31: 11,
+		0x32: 16,
+		0x33: 23,
+	}
+
+	if expected, ok := expectedLengths[msgType]; ok {
+		if length != expected {
+			return newErrorf(nil, "expected %d bytes, received %d", expected, length)
+		}
+	}
+
+	return nil
+}
+
+// UnmarshalBinary stores a Beast message.
+func (f *Frame) UnmarshalBinary(data []byte) error {
+	f.data.Reset()
+
+	if err := validateBeastFormat(data); err != nil {
+		return err
+	}
+
+	// Process escape sequences
 	for i := 0; i < len(data); i++ {
 		if data[i] == 0x1a && (i+1) < len(data) && data[i+1] == 0x1a {
 			i++
@@ -54,22 +81,7 @@ func (f *Frame) UnmarshalBinary(data []byte) error {
 		f.data.WriteByte(data[i])
 	}
 
-	switch data[1] {
-	case 0x31:
-		if f.data.Len() != 11 {
-			return newErrorf(nil, "expected 11 bytes, received %d", f.data.Len())
-		}
-	case 0x32:
-		if f.data.Len() != 16 {
-			return newErrorf(nil, "expected 16 bytes, received %d", f.data.Len())
-		}
-	case 0x33:
-		if f.data.Len() != 23 {
-			return newErrorf(nil, "expected 23 bytes, received %d", f.data.Len())
-		}
-	}
-
-	return nil
+	return validateBeastLength(data[1], f.data.Len())
 }
 
 // MarshalBinary returns a Beast message.

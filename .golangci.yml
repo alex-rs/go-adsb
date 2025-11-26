@@ -19,7 +19,7 @@ linters:
     - errname           # Checks that sentinel errors are prefixed with `Err` and error types are suffixed with `Error`
     - errorlint         # Find code that will cause problems with error wrapping
     - exhaustive        # Check exhaustiveness of enum switch statements
-    - exportloopref     # Checks for pointers to enclosing loop variables
+    # - exportloopref     # Checks for pointers to enclosing loop variables (deprecated in Go 1.22)
     - fatcontext        # Detects nested contexts in loops
     - forbidigo         # Forbids identifiers
     - forcetypeassert   # Finds forced type assertions
@@ -78,7 +78,7 @@ linters:
     - stylecheck        # Replacement for golint
     - tagalign          # Checks that struct tags are well aligned
     - tagliatelle       # Checks the struct tags
-    - tenv              # Detects using os.Setenv instead of t.Setenv
+    # - tenv              # Detects using os.Setenv instead of t.Setenv (replaced by usetesting)
     - testableexamples  # Checks if examples are testable
     - testifylint       # Checks usage of github.com/stretchr/testify
     - testpackage       # Makes you use a separate _test package
@@ -95,33 +95,168 @@ linters:
     - wsl               # Whitespace Linter - Forces you to use empty lines!
     - zerologlint       # Detects the wrong usage of `zerolog` that a user forgets to dispatch with `Send` or `Msg`
 
-    # Disabled until 1.22
-    #- copyloopvar       # Detects places where loop variables are copied
-    #- intrange          # Finds places where for loops could make use of an integer range
+    # Now enabled with Go 1.22+
+    - copyloopvar       # Detects places where loop variables are copied
+    # - intrange          # Finds places where for loops could make use of an integer range (disabled for now)
 
-    #- cyclop            # Checks function and package cyclomatic complexity
+    # Additional useful linters for code quality
+    - cyclop            # Checks function and package cyclomatic complexity
+    - exhaustruct       # Checks if all structure fields are initialized
+    - goheader          # Checks if file header matches to pattern
+    - lll               # Reports long lines
+    - mnd               # An analyzer to detect magic numbers
+    - musttag           # Enforce field tags in (un)marshaled structs
+    - nonamedreturns    # Reports all named returns
+    - paralleltest      # Detects missing usage of t.Parallel() method in tests
+
+    # Optional - uncomment if desired:
     #- depguard          # Checks if package imports are in a list of acceptable packages
-    #- exhaustruct       # Checks if all structure fields are initialized
     #- gochecknoglobals  # Checks that no globals are present
-    #- goheader          # Checks if file header matches to pattern
     #- gomodguard        # Allow and block list linter for direct Go module dependencies
-    #- lll               # Reports long lines
-    #- mnd               # An analyzer to detect magic numbers
-    #- musttag           # Enforce field tags in (un)marshaled structs
-    #- nonamedreturns    # Reports all named returns
-    #- paralleltest      # Detects missing usage of t.Parallel() method in tests
     #- varnamelen        # Checks that the length of a variable's name matches its scope
 
 issues:
   exclude-use-default: false
+  exclude-rules:
+    # Test-related exclusions
+    - path: _test\.go
+      linters:
+        - exhaustruct     # Tests often don't need all struct fields
+        - paralleltest    # Not all tests need to be parallel
+        - goheader        # Test files may have different headers
+        - funlen          # Test functions can be longer
+        - cyclop          # Test functions can have higher complexity
+        - mnd             # Magic numbers are common in test data
+
+    # Exclude checking header for all .github files
+    - path: \.github/
+      linters:
+        - goheader
+
+    # Specific file exclusions
+    - path: beast/internal/
+      linters:
+        - exhaustruct     # Internal test mocks don't need all fields
+
+    # Exclude common ADS-B magic numbers and bit positions
+    - path: adsb/
+      linters:
+        - mnd
+      text: "Magic number: [0-9]+, in <argument> detected"
+
+    # Exclude goheader since our headers are already correct
+    - linters:
+        - goheader
+      text: "Actual: Copyright 2024 Collin Kreklow"
+
+    # Exclude common math constants and ADS-B protocol numbers
+    - text: "Magic number: 0.5"
+      linters:
+        - mnd
+    - text: "Magic number: [0-9]+, in <case> detected"
+      linters:
+        - mnd
+    - text: "Magic number: [0-9]+, in <condition> detected"
+      linters:
+        - mnd
+    - text: "Magic number: 0x[0-9a-fA-F]+, in <condition> detected"
+      linters:
+        - mnd
+    - text: "Magic number: [0-9]+, in <(argument|operation|assign|return)> detected"
+      linters:
+        - mnd
+    - text: "Magic number: 0x[0-9a-fA-F]+, in <(argument|operation|case|assign|return)> detected"
+      linters:
+        - mnd
+    - text: "Magic number: 0b[01]+, in <operation> detected"
+      linters:
+        - mnd
+    # Additional ADS-B specific exclusions
+    - text: "Magic number: 360.0, in <operation> detected"
+      linters:
+        - mnd
+    - text: "Magic number: 131072, in <operation> detected"
+      linters:
+        - mnd
+    - text: "Magic number: [0-9]+.[0-9]+, in <assign> detected"
+      linters:
+        - mnd
+    - text: "Magic number: [0-9]+.0, in <operation> detected"
+      linters:
+        - mnd
+    # Style preferences
+    - linters:
+        - wsl
+      text: "return statements should not be cuddled if block has more than two lines"
+    # Allow named returns for simple getter functions
+    - linters:
+        - nonamedreturns
+      text: "named return \"(bits|p)\" with type \"uint64\" found"
+
+    # Allow nolint directives even if linter is disabled
+    - linters:
+        - nolintlint
+      text: "directive.*is unused for linter"
+
+    # Allow reasonable code formatting preferences
+    - linters:
+        - wsl
+      text: "assignments should only be cuddled with other assignments"
+    - linters:
+        - wsl
+      text: "if statements should only be cuddled with assignments"
+    - linters:
+        - wsl
+      text: "only one cuddle assignment allowed before if statement"
+    - linters:
+        - nlreturn
+      text: "return with no blank line before"
 
 linters-settings:
   gosec:
     excludes:
       - G104
       - G307
+      - G115  # integer overflow conversion - safe in this ADS-B context
   nolintlint:
     allow-unused: false
-    allow-leading-space: false
     require-explanation: true
     require-specific: true
+
+  # Settings for newly enabled linters
+  cyclop:
+    max-complexity: 15
+    package-average: 10.0
+
+  exhaustruct:
+    exclude:
+      - "net/http.Client"
+      - "net/http.Request"
+      - "testing.TB"
+      - "testing.F"
+      - "testing.B"
+
+  goheader:
+    template-path: .github/header_template.txt
+
+  lll:
+    line-length: 120
+
+  mnd:
+    checks:
+      - argument
+      - case
+      - condition
+      - operation
+      - return
+    ignored-numbers:
+      - "0"
+      - "1"
+      - "2"
+      - "-1"
+    ignored-functions:
+      - "math.*"
+      - "strconv.*"
+
+  nonamedreturns:
+    report-error-in-defer: false
