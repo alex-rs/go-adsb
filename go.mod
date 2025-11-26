@@ -1,3 +1,3 @@
-module kreklow.us/go/go-adsb
+module github.com/alex-rs/go-adsb
 
 go 1.13
