@@ -193,8 +193,6 @@ for nl := 59; nl > 1; nl-- {
 	c := math.Sqrt(a / b)
 
 	tbl[nl] = (180 / math.Pi) * math.Acos(c)
-
-	fmt.Printf("%d: %s\n", nl, big.NewFloat(tbl[nl]).String())
 }
 */
 

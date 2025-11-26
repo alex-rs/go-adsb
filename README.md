@@ -1,5 +1,5 @@
 # Overview
-[![PkgGoDev](https://pkg.go.dev/badge/kreklow.us/go/go-adsb)](https://pkg.go.dev/kreklow.us/go/go-adsb)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/alex-rs/go-adsb)](https://pkg.go.dev/github.com/alex-rs/go-adsb)
 ![License](https://img.shields.io/github/license/cjkreklow/go-adsb)
 ![Version](https://img.shields.io/github/v/tag/cjkreklow/go-adsb)
 ![Status](https://github.com/cjkreklow/go-adsb/actions/workflows/push.yml/badge.svg?branch=main)
@@ -39,7 +39,7 @@ the text description of the value to be returned via the `%s` operator in
 Printf-style operations.
 
 # Usage
-See the documentation on [pkg.go.dev](https://pkg.go.dev/kreklow.us/go/go-adsb)
+See the documentation on [pkg.go.dev](https://pkg.go.dev/github.com/alex-rs/go-adsb)
 for import paths and usage information.
 
 # About

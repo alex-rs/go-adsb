@@ -25,6 +25,7 @@ package adsb
 import (
 	"bytes"
 	"errors"
+	"math"
 )
 
 // Message provides a high-level abstraction for ADS-B messages. The
@@ -230,8 +231,17 @@ func (m *Message) CPR() (*CPR, error) {
 	c.Nb = 17
 	c.T = m.raw.Bit(53)
 	c.F = m.raw.Bit(54)
-	c.Lat = uint32(m.raw.Bits(55, 71))
-	c.Lon = uint32(m.raw.Bits(72, 88))
+	// Safe conversion: extracting 17-bit values into uint32
+	latBits := m.raw.Bits(55, 71)
+	lonBits := m.raw.Bits(72, 88)
+	if latBits > math.MaxUint32 {
+		return nil, newError(nil, "latitude bits overflow")
+	}
+	if lonBits > math.MaxUint32 {
+		return nil, newError(nil, "longitude bits overflow")
+	}
+	c.Lat = uint32(latBits)
+	c.Lon = uint32(lonBits)
 
 	return c, nil
 }

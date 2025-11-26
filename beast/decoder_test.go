@@ -29,8 +29,8 @@ import (
 	"io"
 	"testing"
 
-	"kreklow.us/go/go-adsb/beast"
-	"kreklow.us/go/go-adsb/beast/internal"
+	"github.com/alex-rs/go-adsb/beast"
+	"github.com/alex-rs/go-adsb/beast/internal"
 )
 
 func TestDecode(t *testing.T) {

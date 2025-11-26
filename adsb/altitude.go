@@ -22,6 +22,8 @@
 
 package adsb
 
+import "math"
+
 // decodeAC decodes the Altitude Code field to an altitude in feet.
 func decodeAC(a uint64) (int64, error) {
 	if a == 0 || a&0xffffffffffffe000 != 0 {
@@ -62,7 +64,12 @@ func decodeAC(a uint64) (int64, error) {
 			h = 6 - h
 		}
 
-		return int64((f*500)+(h*100)) - 1300, nil
+		// Values are safe: f max is 31 (11-bit gray code), h max is 5
+		result := (f * 500) + (h * 100)
+		if result > math.MaxInt64+1300 {
+			return 0, newError(nil, "altitude overflow")
+		}
+		return int64(result) - 1300, nil
 	}
 
 	// must be an 11 bit altitude
@@ -70,6 +77,10 @@ func decodeAC(a uint64) (int64, error) {
 		((a & 0b0000000100000) >> 1) |
 		(a & 0b0000000001111)
 
+	// Value is safe: a is 11-bit after bit manipulation
+	if a > math.MaxInt64/25+40 {
+		return 0, newError(nil, "altitude overflow")
+	}
 	return int64(a*25) - 1000, nil
 }
 
