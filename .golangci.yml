@@ -220,7 +220,6 @@ linters-settings:
       - G115  # integer overflow conversion - safe in this ADS-B context
   nolintlint:
     allow-unused: false
-    allow-leading-space: false
     require-explanation: true
     require-specific: true
 
@@ -244,22 +243,20 @@ linters-settings:
     line-length: 120
 
   mnd:
-    settings:
-      mnd:
-        checks:
-          - argument
-          - case
-          - condition
-          - operation
-          - return
-        ignored-numbers:
-          - 0
-          - 1
-          - 2
-          - -1
-        ignored-functions:
-          - "math.*"
-          - "strconv.*"
+    checks:
+      - argument
+      - case
+      - condition
+      - operation
+      - return
+    ignored-numbers:
+      - "0"
+      - "1"
+      - "2"
+      - "-1"
+    ignored-functions:
+      - "math.*"
+      - "strconv.*"
 
   nonamedreturns:
     report-error-in-defer: false
