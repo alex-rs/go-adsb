@@ -47,6 +47,12 @@ type Decoder struct {
 	// BinaryUnmarshaler by Decode.
 	StripEscape bool
 
+	// Setting ResyncOnError will cause the decoder to seek forward to
+	// the next frame preamble when a decode error occurs, allowing
+	// recovery in noisy streams without surfacing the error to the
+	// caller.
+	ResyncOnError bool
+
 	r   decoderReader
 	buf bytes.Buffer
 }
@@ -63,55 +69,72 @@ func NewDecoder(r io.Reader) *Decoder {
 // in f. The data passed to f remains valid only until the next call to
 // Decode().
 func (d *Decoder) Decode(f encoding.BinaryUnmarshaler) error {
-	// make sure the stream is at the beginning of a frame
-	t, err := d.r.Peek(2)
-	if err != nil {
-		return readError(err)
-	}
-
-	if !(t[0] == 0x1a &&
-		(t[1] == 0x31 || t[1] == 0x32 || t[1] == 0x33 || t[1] == 0x34)) {
-		err = d.seekNext()
-		if err != nil {
-			return err
-		}
-
-		t, err = d.r.Peek(2)
+	for {
+		// make sure the stream is at the beginning of a frame
+		t, err := d.r.Peek(2)
 		if err != nil {
 			return readError(err)
 		}
+
+		if !isFrameStart(t) {
+			if err = d.seekNext(); err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		d.buf.Reset()
+
+		// store the frame type escape sequence
+		d.buf.Write(t)
+
+		if _, err = d.r.Discard(2); err != nil {
+			return readError(err)
+		}
+
+		// read the remainder of the message
+		err = d.readMsg()
+		if err != nil && !errors.Is(err, io.EOF) {
+			if d.ResyncOnError {
+				if err = d.resync(); err != nil {
+					return err
+				}
+
+				continue
+			}
+
+			return err
+		}
+
+		err = f.UnmarshalBinary(d.buf.Bytes())
+		if err != nil {
+			if d.ResyncOnError {
+				if err = d.resync(); err != nil {
+					return err
+				}
+
+				continue
+			}
+
+			return newError(err, "error unmarshalling data")
+		}
+
+		return nil
 	}
-
-	d.buf.Reset()
-
-	// store the frame type escape sequence
-	d.buf.Write(t)
-
-	_, err = d.r.Discard(2)
-	if err != nil {
-		return readError(err)
-	}
-
-	// read the remainder of the message
-	err = d.readMsg()
-	if err != nil && !errors.Is(err, io.EOF) {
-		return err
-	}
-
-	err = f.UnmarshalBinary(d.buf.Bytes())
-	if err != nil {
-		return newError(err, "error unmarshalling data")
-	}
-
-	return nil
 }
 
 // seekNext attempts to seek the input buffer to the next frame start
 // sequence.
 func (d *Decoder) seekNext() error {
-	ct := 100 // don't read more than 100 bytes
-	if d.r.Buffered() < ct {
-		ct = d.r.Buffered()
+	ct := d.r.Buffered()
+
+	// attempt to read ahead to find the next preamble
+	switch {
+	case ct < 2:
+		ct = 2
+	case ct > 100:
+		ct = 100
 	}
 
 	b, err := d.r.Peek(ct)
@@ -119,22 +142,24 @@ func (d *Decoder) seekNext() error {
 		return readError(err)
 	}
 
-	var n int
+	n := -1
 
 	for _, t := range []byte{0x31, 0x32, 0x33, 0x34} {
 		nx := bytes.Index(b, []byte{0x1a, t})
-		if n == 0 && nx > 0 || nx > 0 && nx < n {
+		if nx >= 0 && (n == -1 || nx < n) {
 			n = nx
 		}
 	}
 
-	if n == 0 {
+	if n < 0 {
 		return newError(nil, "no frame data found")
 	}
 
-	_, err = d.r.Discard(n)
-	if err != nil {
-		return readError(err)
+	if n > 0 {
+		_, err = d.r.Discard(n)
+		if err != nil {
+			return readError(err)
+		}
 	}
 
 	return nil
@@ -199,4 +224,20 @@ func readError(w error) beastError {
 		msg:  "error reading stream",
 		werr: w,
 	}
+}
+
+func (d *Decoder) resync() error {
+	err := d.seekNext()
+	if err != nil {
+		return err
+	}
+
+	d.buf.Reset()
+
+	return nil
+}
+
+func isFrameStart(t []byte) bool {
+	return len(t) >= 2 && t[0] == 0x1a &&
+		(t[1] == 0x31 || t[1] == 0x32 || t[1] == 0x33 || t[1] == 0x34)
 }

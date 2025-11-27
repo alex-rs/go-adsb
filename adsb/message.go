@@ -23,7 +23,6 @@
 package adsb
 
 import (
-	"bytes"
 	"errors"
 	"math"
 )
@@ -141,35 +140,57 @@ var callChars = []byte(
 
 // Call returns the callsign.
 func (m *Message) Call() (string, error) {
+	call, err := m.CallBytes(nil)
+	if err != nil {
+		return "", err
+	}
+
+	return string(call), nil
+}
+
+// CallBytes appends the callsign bytes (without trailing spaces) to dst
+// and returns the resulting slice. Providing a preallocated dst avoids
+// allocations. Use Call() when a string is required.
+func (m *Message) CallBytes(dst []byte) ([]byte, error) {
 	df, err := m.raw.DF()
 	if err != nil {
-		return "", newError(err, "error retrieving callsign")
+		return nil, newError(err, "error retrieving callsign")
 	}
 
 	switch df {
 	case 17, 18:
 		tc, _ := m.raw.ESType()
 		if tc < 1 || tc > 4 {
-			return "", newError(ErrNotAvailable, "error retrieving callsign")
+			return nil, newError(ErrNotAvailable, "error retrieving callsign")
 		}
 	case 20, 21:
 		if m.raw.Bits(33, 40) != 0x20 {
-			return "", newError(ErrNotAvailable, "error retrieving callsign")
+			return nil, newError(ErrNotAvailable, "error retrieving callsign")
 		}
 	default:
-		return "", newError(ErrNotAvailable, "error retrieving callsign")
+		return nil, newError(ErrNotAvailable, "error retrieving callsign")
 	}
 
 	bits := m.raw.Bits(41, 88)
 
-	call := make([]byte, 8)
+	var call [8]byte
+	last := -1
 
-	var i uint
-	for i = 0; i < 8; i++ {
-		call[i] = callChars[(bits>>(42-(i*6)))&0x3F]
+	for i := 0; i < 8; i++ {
+		call[i] = callChars[(bits>>(42-(uint(i)*6)))&0x3F]
+
+		if call[i] != ' ' {
+			last = i
+		}
 	}
 
-	return string(bytes.TrimRight(call, " ")), nil
+	if last == -1 {
+		return dst[:0], nil
+	}
+
+	dst = append(dst[:0], call[:last+1]...)
+
+	return dst, nil
 }
 
 var sqkTbl = [][]int{
@@ -208,6 +229,12 @@ func (m *Message) Sqk() ([]byte, error) {
 
 // CPR returns the compact position report.
 func (m *Message) CPR() (*CPR, error) {
+	return m.CPRInto(nil)
+}
+
+// CPRInto populates dst with CPR data. If dst is nil, a new CPR is
+// allocated. Reusing dst avoids allocations.
+func (m *Message) CPRInto(dst *CPR) (*CPR, error) {
 	df, err := m.raw.DF()
 	if err != nil {
 		return nil, newError(err, "error retrieving position")
@@ -227,7 +254,11 @@ func (m *Message) CPR() (*CPR, error) {
 		return nil, newError(ErrNotAvailable, "error retrieving position")
 	}
 
-	c := new(CPR)
+	if dst == nil {
+		dst = new(CPR)
+	}
+
+	c := dst
 	c.Nb = 17
 	c.T = m.raw.Bit(53)
 	c.F = m.raw.Bit(54)

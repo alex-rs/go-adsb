@@ -56,7 +56,7 @@ func testSeekPeekErr(t *testing.T) {
 func testSeekDiscardErr(t *testing.T) {
 	mr := &internal.MockReader{
 		Buf:          bytes.NewBuffer([]byte{0xff, 0xff, 0xff, 0xff, 0x1a, 0x31}),
-		PeekCount:    6,
+		PeekCount:    8,
 		DiscardCount: 0,
 		DiscardErr:   errors.New("seek discard error"),
 	}

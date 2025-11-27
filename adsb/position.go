@@ -86,6 +86,15 @@ func (c *CPR) DecodeLocal(rp []float64) ([]float64, error) {
 // a time difference of less than 10 seconds (3 NM distance). The
 // return value is in the format [latitude, longitude].
 func DecodeGlobalPosition(c1 *CPR, c2 *CPR) ([]float64, error) {
+	coord := make([]float64, 2)
+
+	return DecodeGlobalPositionInto(c1, c2, coord)
+}
+
+// DecodeGlobalPositionInto populates dst with a globally unambiguous
+// [latitude, longitude] position by combining two CPR messages. dst
+// must have length 2 or greater. Reusing dst avoids allocations.
+func DecodeGlobalPositionInto(c1 *CPR, c2 *CPR, dst []float64) ([]float64, error) {
 	switch {
 	case c1 == nil || c2 == nil:
 		return nil, newError(nil, "incomplete arguments")
@@ -93,6 +102,8 @@ func DecodeGlobalPosition(c1 *CPR, c2 *CPR) ([]float64, error) {
 		return nil, newError(nil, "bit encoding must be equal")
 	case c1.F == c2.F:
 		return nil, newError(nil, "format must be different")
+	case len(dst) < 2:
+		return nil, newError(nil, "destination must have length >= 2")
 	}
 
 	var t0 bool // set t0 to true if the even format is the later message
@@ -132,15 +143,13 @@ func DecodeGlobalPosition(c1 *CPR, c2 *CPR) ([]float64, error) {
 		return nil, newError(nil, "positions cross latitude boundary")
 	}
 
-	coord := calcGlobal(t0, lon0, lon1, rlat0, rlat1)
-
-	return coord, nil
+	return calcGlobalInto(t0, lon0, lon1, rlat0, rlat1, dst), nil
 }
 
-func calcGlobal(t0 bool, lon0, lon1, rlat0, rlat1 float64) []float64 {
+func calcGlobalInto(t0 bool, lon0, lon1, rlat0, rlat1 float64, coord []float64) []float64 {
 	var nl, ni, dlon, lonc float64
 
-	coord := make([]float64, 2)
+	coord = coord[:2]
 
 	if t0 { //nolint:nestif // variables assigned based on t0 type
 		coord[0] = rlat0

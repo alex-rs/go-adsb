@@ -26,3 +26,16 @@ jobs:
           file: ./coverage.txt
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
+
+  bench:
+    runs-on: ubuntu-latest
+    name: Bench Guard
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run Benchmark Guard
+        run: bash scripts/bench_guard.sh
