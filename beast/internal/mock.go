@@ -60,6 +60,14 @@ func (r *MockReader) Discard(n int) (int, error) {
 
 	r.DiscardCount -= n
 
+	if r.Buf.Len() < n {
+		r.Buf.Reset()
+
+		return n, nil
+	}
+
+	r.Buf.Next(n)
+
 	return n, nil
 }
 
@@ -76,7 +84,11 @@ func (r *MockReader) Peek(n int) ([]byte, error) {
 
 	r.PeekCount -= n
 
-	return r.Buf.Next(n), nil
+	if r.Buf.Len() < n {
+		return nil, errors.New("unexpected error in Peek") //nolint:goerr113 // no error to wrap
+	}
+
+	return r.Buf.Bytes()[:n], nil
 }
 
 // ReadByte returns the next available byte from Buf.

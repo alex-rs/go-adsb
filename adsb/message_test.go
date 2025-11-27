@@ -876,6 +876,32 @@ func testCall(t *testing.T, tc *testCase, msg *adsb.Message) {
 	}
 }
 
+func TestCallBytesReuse(t *testing.T) {
+	raw, err := hex.DecodeString("a0000f9820057273df8d20e2cf30") // DF20 with callsign AWI3784
+	if err != nil {
+		t.Fatal("received unexpected error", err)
+	}
+
+	m := new(adsb.Message)
+	if err := m.UnmarshalBinary(raw); err != nil {
+		t.Fatal("received unexpected error", err)
+	}
+
+	buf := make([]byte, 0, 8)
+	out, err := m.CallBytes(buf)
+	if err != nil {
+		t.Fatal("received unexpected error", err)
+	}
+
+	if string(out) != "AWI3784" {
+		t.Errorf("CallBytes: received %s, expected AWI3784", string(out))
+	}
+
+	if len(out) == 0 || cap(out) != cap(buf) {
+		t.Errorf("CallBytes: expected reuse of provided buffer")
+	}
+}
+
 func testAlt(t *testing.T, tc *testCase, msg *adsb.Message) {
 	t.Helper()
 
@@ -949,5 +975,87 @@ func testAltError(t *testing.T, tc *testCase, msg *adsb.Message) {
 
 	if tc.AltError != err.Error() {
 		t.Errorf("expected %s, received %s", tc.AltError, err)
+	}
+}
+
+func TestCPRIntoReuse(t *testing.T) {
+	raw, err := hex.DecodeString("8da8028758ab0028de078689d437") // DF17 global position even
+	if err != nil {
+		t.Fatal("received unexpected error", err)
+	}
+
+	msg := new(adsb.Message)
+	if err := msg.UnmarshalBinary(raw); err != nil {
+		t.Fatal("received unexpected error", err)
+	}
+
+	var dst adsb.CPR
+	dst.Lat = 123 // sentinel to ensure overwrite
+
+	cpr, err := msg.CPRInto(&dst)
+	if err != nil {
+		t.Fatal("received unexpected error", err)
+	}
+
+	if cpr != &dst {
+		t.Fatal("expected CPRInto to reuse provided buffer")
+	}
+
+	if cpr.Nb != 17 || cpr.Lat == 123 {
+		t.Errorf("unexpected CPR contents: %+v", cpr)
+	}
+}
+
+func TestDecodeGlobalPositionIntoReuse(t *testing.T) {
+	rawEven, err := hex.DecodeString("8da8028758ab0028de078689d437")
+	if err != nil {
+		t.Fatal("received unexpected error", err)
+	}
+
+	rawOdd, err := hex.DecodeString("8da8028758ab07b0b8876e81eb25")
+	if err != nil {
+		t.Fatal("received unexpected error", err)
+	}
+
+	var cprEven, cprOdd adsb.CPR
+	dst := []float64{-1, -1}
+
+	m1 := new(adsb.Message)
+	m2 := new(adsb.Message)
+
+	if err := m1.UnmarshalBinary(rawEven); err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	if _, err := m1.CPRInto(&cprEven); err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	if err := m2.UnmarshalBinary(rawOdd); err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	if _, err := m2.CPRInto(&cprOdd); err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	out, err := adsb.DecodeGlobalPositionInto(&cprEven, &cprOdd, dst)
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	if &out[0] != &dst[0] {
+		t.Fatal("expected DecodeGlobalPositionInto to reuse dst slice")
+	}
+
+	expLat := 42.23945229
+	expLon := -89.87851165
+
+	if diff := out[0] - expLat; diff > 1e-6 || diff < -1e-6 {
+		t.Errorf("Lat: received %f, expected %f", out[0], expLat)
+	}
+
+	if diff := out[1] - expLon; diff > 1e-6 || diff < -1e-6 {
+		t.Errorf("Lon: received %f, expected %f", out[1], expLon)
 	}
 }

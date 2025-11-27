@@ -95,6 +95,48 @@ func TestDecodeError(t *testing.T) {
 	t.Run("Corrupt", testDecodeCorrupt)
 }
 
+func TestDecodeResync(t *testing.T) {
+	good1, err := hex.DecodeString("1a311a1af933baf325c45047")
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	good2, err := hex.DecodeString("1a321a1af933baf325c45da99adad95ff6")
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	var buf bytes.Buffer
+	buf.Write(good1)
+	// truncated frame to trigger resync
+	buf.Write([]byte{0x1a, 0x33, 0xff, 0x00})
+	buf.Write(good2)
+
+	d := beast.NewDecoder(bytes.NewReader(buf.Bytes()))
+	d.StripEscape = true
+	d.ResyncOnError = true
+
+	f := new(beast.Frame)
+
+	var decoded int
+
+	for {
+		if err := d.Decode(f); err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		decoded++
+	}
+
+	if decoded != 2 {
+		t.Fatalf("expected 2 frames after resync, received %d", decoded)
+	}
+}
+
 func testDecodeNull(t *testing.T) {
 	testDecoderError(t, "", "error reading stream: EOF", io.EOF)
 }
