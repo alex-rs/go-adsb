@@ -97,6 +97,7 @@ func NoisyBeastStream(n int) []byte {
 			// insert a truncated header to force resync
 			buf.Write([]byte{0x1a, 0x33, 0xff})
 		}
+
 		buf.Write(BeastFrames[i%len(BeastFrames)])
 		buf.Write(noiseChunks[(i+1)%len(noiseChunks)])
 	}

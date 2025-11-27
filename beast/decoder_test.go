@@ -107,9 +107,11 @@ func TestDecodeResync(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
+
 	buf.Write(good1)
 	// truncated frame to trigger resync
 	buf.Write([]byte{0x1a, 0x33, 0xff, 0x00})
+
 	buf.Write(good2)
 
 	d := beast.NewDecoder(bytes.NewReader(buf.Bytes()))

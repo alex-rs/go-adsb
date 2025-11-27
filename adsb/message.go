@@ -258,8 +258,6 @@ func (m *Message) CPRInto(dst *CPR) (*CPR, error) {
 		dst = new(CPR)
 	}
 
-	*dst = CPR{}
-
 	c := dst
 	c.Nb = 17
 	c.T = m.raw.Bit(53)

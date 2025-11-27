@@ -23,6 +23,7 @@
 package adsb_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/alex-rs/go-adsb/adsb"
@@ -30,6 +31,8 @@ import (
 )
 
 func benchmarkMessage(b *testing.B, payload []byte, fn func(m *adsb.Message) error) {
+	b.Helper()
+
 	msg := new(adsb.Message)
 
 	b.ReportAllocs()
@@ -52,7 +55,11 @@ func BenchmarkMessageICAO(b *testing.B) {
 
 	benchmarkMessage(b, payload, func(m *adsb.Message) error {
 		_, err := m.ICAO()
-		return err
+		if err != nil {
+			return fmt.Errorf("icao: %w", err)
+		}
+
+		return nil
 	})
 }
 
@@ -61,7 +68,11 @@ func BenchmarkMessageAltitude(b *testing.B) {
 
 	benchmarkMessage(b, payload, func(m *adsb.Message) error {
 		_, err := m.Alt()
-		return err
+		if err != nil {
+			return fmt.Errorf("altitude: %w", err)
+		}
+
+		return nil
 	})
 }
 
@@ -71,7 +82,11 @@ func BenchmarkMessageCallsign(b *testing.B) {
 
 	benchmarkMessage(b, payload, func(m *adsb.Message) error {
 		_, err := m.CallBytes(callBuf[:0])
-		return err
+		if err != nil {
+			return fmt.Errorf("callsign: %w", err)
+		}
+
+		return nil
 	})
 }
 
